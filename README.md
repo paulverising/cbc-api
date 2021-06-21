@@ -48,7 +48,7 @@ ssl_verify=True
 ```
 This is where the API Secret Key, API ID, and ORG KEY will be entered.
 ## Python Environment Setup
-The first step is to make sure to have python 3 installed.
+The first step is to make sure to have python 3.6+ installed.
 
 The recommended method for setting up the python environment is through a python virtual environment. The steps will be listed below for how to set this up. If you feel confident in your own setup the only requirements you need to install with pip are: requests and pandas.
 ### Virtual Environment Setup - MacOS

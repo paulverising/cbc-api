@@ -40,7 +40,7 @@ def getConfig():
         cred_file = "C:\\Windows\\carbonblack\\credentials.cbc"
     else:
         home = expanduser("~")
-        cred_file = "{}/.carbonblack/credentials.cbc".format(home)
+        cred_file = f"{home}/.carbonblack/credentials.cbc"
 
     with open(cred_file) as file:
         datafile = file.readlines()
@@ -65,7 +65,7 @@ def get_job_id(domain, org_key, headers, hostname="*", process="*", window="10h"
     Function takes in the domain, org_key, headers, hostname, and timeframe to generate 
     the initial query an retrieve the job id of that query returns job_id
     """
-    url = "{}/api/investigate/v2/orgs/{}/processes/search_jobs".format(domain, org_key)
+    url = f"{domain}/api/investigate/v2/orgs/{org_key}/processes/search_jobs"
     print(url)
     if hostname == "*":
         query_payload = {
@@ -113,9 +113,7 @@ def check_status(domain, org_key, job_id, headers):
     that runs until "contacted" == "completed", this indicates that the query has finished 
     running and we can now retrieve results returns the bool True when complete
     """
-    url = "{}/api/investigate/v1/orgs/{}/processes/search_jobs/{}".format(
-        domain, org_key, job_id
-    )
+    url = f"{domain}/api/investigate/v1/orgs/{org_key}/processes/search_jobs/{job_id}"
     contacted = ""
     completed = "1"
     print("Checking to see if query has completed...")
@@ -134,9 +132,7 @@ def get_results(domain, org_key, job_id, headers):
     """
     print("Retrieving the results. Please stand by...")
     all_df = pd.DataFrame()
-    url = "{}/api/investigate/v2/orgs/{}/processes/search_jobs/{}/results".format(
-        domain, org_key, job_id
-    )
+    url = f"{domain}/api/investigate/v2/orgs/{org_key}/processes/search_jobs/{job_id}/results"
     for i in range(0, 10000, 1000):
         payload = {"start": i, "rows": 1000}
         response = requests.get(url, headers=headers, params=payload).json()
@@ -151,7 +147,7 @@ def df_to_csv(results, param):
     """
     Takes in the dataframe and argument parameter input and writes it to a csv.
     """
-    output_file = "{}-process.csv".format(param)
+    output_file = f"{param}-process.csv"
     results.to_csv(
         output_file,
         index=False,
