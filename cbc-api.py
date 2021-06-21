@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser(description='Use cbr-api.py to see all processe
 group1=parser.add_mutually_exclusive_group(required = True)
 group1.add_argument('--host', type=str, help="Enter in the name of the host you want to see all the processes on.")
 group1.add_argument('--process', type=str, help="Enter in the name of the process you want to search.")
+parser.add_argument('--window', type=str, required=False, help="OPTIONAL: Default is -10h. Time window: “-2w” where y=year, w=week, d=day, h=hour, m=minute, s=second")
 
 args = parser.parse_args()
 
@@ -37,7 +38,7 @@ def getConfig():
         headers = {'X-Auth-Token': auth_token, 'Content-Type': 'application/json', 'accept': 'application/json'}
     return (address, headers, org)
 
-def get_job_id(domain, org_key, headers, hostname = "*", process = "*", window = "-10h"):
+def get_job_id(domain, org_key, headers, hostname = "*", process = "*", window = "10h"):
     '''
     Function takes in the domain, org_key, headers, hostname, and timeframe to generate the initial query an retrieve the job id of that query
     returns job_id 
@@ -45,9 +46,9 @@ def get_job_id(domain, org_key, headers, hostname = "*", process = "*", window =
     url = "{}/api/investigate/v2/orgs/{}/processes/search_jobs".format(domain, org_key)
     print(url)
     if hostname == "*":
-        query_payload = {"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": window}}
+        query_payload = {"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": "-"+ window}}
     else:
-        query_payload = {"criteria": {"device_name": [hostname]},"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": window}}
+        query_payload = {"criteria": {"device_name": [hostname]},"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": "-"+ window}}
     print("")
     response = requests.post(url, headers=headers, json=query_payload).json()
     job_id = response.get('job_id')
@@ -102,11 +103,19 @@ if __name__ == '__main__':
     if args.host:
         hostname = args.host
         param = args.host
-        job_id = get_job_id(domain, org_key, headers, hostname = hostname)
+        if args.window:
+            window = args.window
+            job_id = get_job_id(domain, org_key, headers, hostname = hostname, window = window)
+        else:
+            job_id = get_job_id(domain, org_key, headers, hostname = hostname)
     elif args.process:
         process = args.process
         param = args.process
-        job_id = get_job_id(domain, org_key, headers, process = process)
+        if args.window:
+            window = args.window
+            job_id = get_job_id(domain, org_key, headers, process = process, window = window)
+        else:
+            job_id = get_job_id(domain, org_key, headers, process = process)
     status = check_status(domain, org_key, job_id, headers)
     if status == True:
         results = get_results(domain, org_key, job_id, headers)
