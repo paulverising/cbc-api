@@ -11,7 +11,7 @@ parser = argparse.ArgumentParser(description='Use cbr-api.py to see all processe
 group1=parser.add_mutually_exclusive_group(required = True)
 group1.add_argument('--host', type=str, help="Enter in the name of the host you want to see all the processes on.")
 group1.add_argument('--process', type=str, help="Enter in the name of the process you want to search.")
-parser.add_argument('--window', type=str, required=False, help="OPTIONAL: Default is -10h. Time window: “-2w” where y=year, w=week, d=day, h=hour, m=minute, s=second")
+parser.add_argument('--window', type=str, required=False, help="OPTIONAL: Default is 10h. Time window: “2w” where y=year, w=week, d=day, h=hour, m=minute, s=second")
 
 args = parser.parse_args()
 
