@@ -90,7 +90,7 @@ def get_results(domain, org_key, job_id, headers):
 
 def df_to_csv(results, param):
     '''
-    takes in the dataframe and XXXX input and writes it to a csv
+    takes in the dataframe and argument parameter input and writes it to a csv
     '''
     output_file = '{}-process.csv'.format(param)
     results.to_csv(output_file, index = False, columns = ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"])
