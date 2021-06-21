@@ -1,77 +1,115 @@
-# from cbc_sdk.helpers import *
-from cbc_sdk.platform import *
-from cbc_sdk.platform.alerts import *
-from cbc_sdk.rest_api import *
+import requests
+import pandas as pd
+import time
 import argparse
-import csv
-import json
+import sys
+from os.path import expanduser
+start_time = time.time()
 
 # Handle the parameters that are passed into the program
 parser = argparse.ArgumentParser(description='Use cbr-api.py to see all processes on a specific host or search for a process across the environment.')
-group1=parser.add_mutually_exclusive_group()
+group1=parser.add_mutually_exclusive_group(required = True)
 group1.add_argument('--host', type=str, help="Enter in the name of the host you want to see all the processes on.")
 group1.add_argument('--process', type=str, help="Enter in the name of the process you want to search.")
 
 args = parser.parse_args()
 
-cb = CBCloudAPI(profile='default')
+def getConfig():
+    '''
+    Function reads the contents of the credential file and returns the configuration data to connect to the API of a specific org. Returns the headers for the api request, the org id, and the domain name to connect to.
+    '''
+    if sys.platform == 'Windows':
+        cred_file = 'C:\\Windows\\carbonblack\\credentials.cbc'
+    else:
+        home = expanduser("~")
+        cred_file = '{}/.carbonblack/credentials.cbc'.format(home)
+    
+    with open(cred_file) as file:
+        datafile = file.readlines()
+        for line in datafile:
+            if 'url' in line:
+                address = line.split("=")[1]
+            elif 'token' in line:
+                auth_token = line.split("=")[1]
+            elif 'org' in line:
+                org = line.split("=")[1]
+        auth_token = str(auth_token).strip('\n')
+        headers = {'X-Auth-Token': auth_token, 'Content-Type': 'application/json', 'accept': 'application/json'}
+    return (address, headers, org)
 
-# Write to csv function, loops over the results of the query
-def write_to_csv(file_name, full_query):
-    with open(file_name, 'w') as csv_file:
-        if args.host:
-            csv_file.write("Process Start Time, Name, CMDline, pid, Ppid\n")
-        elif args.process:
-            csv_file.write("Process Start Time, Hostname, Name, CMDline, pid, Ppid\n") 
-        
-        for proc in full_query:
-            try:
-                start_time = proc.process_start_time
-            except:
-                start_time = "NO DATA"
-            try:
-                cmdline = str(proc.process_cmdline)
-            except:
-                cmdline = "NO DATA"
-            try:
-                name = str(proc.process_name)
-            except:
-                name = "NO DATA"
-            # hash = proc.process_hash
-            try:
-                pid = str(proc.process_pid)
-            except:
-                pid = "NO DATA"
-            try:
-                ppid = str(proc.parent_pid)
-            except:
-                ppid = "NO DATA"
-            if args.host:
-                line = '{}, {}, {}, {}, {}\n'.format(start_time, name.replace(',', ''), cmdline.replace(',', ''), pid, ppid)
-            elif args.process:
-                try:
-                    hostname = proc.device_name
-                except:
-                    hostname = "NO DATA"
-                line = '{}, {}, {}, {}, {}, {}\n'.format(start_time, hostname, name.replace(',', ''), cmdline.replace(',', ''), pid, ppid)
-            csv_file.write(line)
+def get_job_id(domain, org_key, headers, hostname = "*", process = "*", window = "-10h"):
+    '''
+    Function takes in the domain, org_key, headers, hostname, and timeframe to generate the initial query an retrieve the job id of that query
+    returns job_id 
+    '''
+    url = "{}/api/investigate/v2/orgs/{}/processes/search_jobs".format(domain, org_key)
+    print(url)
+    if hostname == "*":
+        query_payload = {"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": window}}
+    else:
+        query_payload = {"criteria": {"device_name": [hostname]},"query":"process_name:" + process, "fields": ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"],"sort": [{"field": "device_timestamp","order": "asc"}],"start": 0, "rows": 10000, "time_range": {"window": window}}
+    print("")
+    response = requests.post(url, headers=headers, json=query_payload).json()
+    job_id = response.get('job_id')
+    print("Query sent to Carbon Black Cloud")
+    return job_id
 
-# Create the host query and then call the write_to_csv function
-def host_timeline(host):
-    query = "device_name: " + host
-    full_query = cb.select(Process).where(query).set_fields(["*", "process_cmdline", "process_start_time"])
-    file_name = host + '_processdata.csv'
-    write_to_csv(file_name, full_query)
+def check_status(domain, org_key, job_id, headers):
+    '''
+    Takes in the domain, org_key, job_id, and headers as input and generates a new request that runs until "contacted" == "completed", this indicates that the query has finished running and we can now retrieve results
+    returns the bool True when complete
+    '''
+    url = "{}/api/investigate/v1/orgs/{}/processes/search_jobs/{}".format(domain, org_key, job_id)
+    contacted = ""
+    completed = "1"
+    print("Checking to see if query has completed...")
+    while contacted != completed:   
+        response = requests.get(url, headers=headers).json() 
+        contacted = response.get('contacted')
+        completed = response.get('completed')
+    print("Query has completed.")
+    return True
 
-# Create the process query and then call the write_to_csv function
-def stacking(process):
-    query = "process_name: " + process
-    full_query = cb.select(Process).where(query).set_fields(["*", "process_cmdline", "process_start_time"])
-    file_name = process + '_processdata.csv'
-    write_to_csv(file_name, full_query)
+def get_results(domain, org_key, job_id, headers):
+    '''
+    Takes in domain, org_key, job_id, and headers as input and retrieves the reults in the proper format
+    returns a dataframe
+    '''
+    print("Retrieving the results. Please stand by...")
+    all_df = pd.DataFrame()
+    url = "{}/api/investigate/v2/orgs/{}/processes/search_jobs/{}/results".format(domain, org_key, job_id)
+    for i in range(0, 10000, 1000):
+        payload = {'start': i, 'rows': 1000}
+        response = requests.get(url, headers=headers, params=payload).json()
+        results = response.get('results')
+        r_df = pd.DataFrame.from_dict(results)
+        all_df = all_df.append(r_df, ignore_index = True)
+        del r_df
+    return all_df
+
+def df_to_csv(results, param):
+    '''
+    takes in the dataframe and XXXX input and writes it to a csv
+    '''
+    output_file = '{}-process.csv'.format(param)
+    results.to_csv(output_file, index = False, columns = ["device_name", "process_start_time","process_cmdline", "process_name", "process_pid", "parent_pid"])
 
 if __name__ == '__main__':
+    config = getConfig()
+    domain = str(config[0]).strip('\n')
+    headers = config[1]
+    org_key = str(config[2]).strip('\n')
     if args.host:
-        host_timeline(args.host)
+        hostname = args.host
+        param = args.host
+        job_id = get_job_id(domain, org_key, headers, hostname = hostname)
     elif args.process:
-        stacking(args.process)
+        process = args.process
+        param = args.process
+        job_id = get_job_id(domain, org_key, headers, process = process)
+    status = check_status(domain, org_key, job_id, headers)
+    if status == True:
+        results = get_results(domain, org_key, job_id, headers)
+        print(results)
+    df_to_csv(results, param)
+    print("--- %s seconds ---" % (time.time() - start_time))
