@@ -1,5 +1,7 @@
 # Use Case
 This script allows you to connect to the Carbon Black Cloud instance and see either all of the processes that ran on a single host, or a single process name that ran across the environment.
+
+Requires python 3.6+ and everything in requirements.txt.
 ## Host
 The “--host HOSTNAME” option allows you to enter a hostname and the script will return all of the processes that ran on the host. It outputs to a file titled “HOSTNAME_processdata.csv” and contains:
 - Hostname
