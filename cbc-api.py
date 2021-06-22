@@ -8,27 +8,27 @@ from os.path import expanduser
 start_time = time.time()
 
 # Handle the parameters that are passed into the program
-parser = argparse.ArgumentParser(
-    description="Use cbr-api.py to see all processes on a specific host or search for a process across the environment."
-)
-group1 = parser.add_mutually_exclusive_group(required=True)
-group1.add_argument(
-    "--host",
-    type=str,
-    help="Enter in the name of the host you want to see all the processes on.",
-)
-group1.add_argument(
-    "--process", type=str, help="Enter in the name of the process you want to search."
-)
-parser.add_argument(
-    "--window",
-    type=str,
-    required=False,
-    help="OPTIONAL: Default is 10h. Time window: “2w” where y=year, w=week, d=day, h=hour, m=minute, s=second",
-)
-
-args = parser.parse_args()
-
+def getArgs(argv=None):
+    parser = argparse.ArgumentParser(
+        description="Use cbr-api.py to see all processes on a specific host or search for a process across the environment."
+    )
+    group1 = parser.add_mutually_exclusive_group(required=True)
+    group1.add_argument(
+        "--host",
+        type=str,
+        help="Enter in the name of the host you want to see all the processes on.",
+    )
+    group1.add_argument(
+        "--process", type=str, help="Enter in the name of the process you want to search."
+    )
+    parser.add_argument(
+        "--window",
+        type=str,
+        required=False,
+        help="OPTIONAL: Default is 10h. Time window: “2w” where y=year, w=week, d=day, h=hour, m=minute, s=second",
+    )
+    args = parser.parse_args(argv)
+    return args
 
 def getConfig():
     """
@@ -163,6 +163,7 @@ def df_to_csv(results, param):
 
 
 if __name__ == "__main__":
+    args = getArgs()
     config = getConfig()
     domain = str(config[0]).strip("\n")
     headers = config[1]
