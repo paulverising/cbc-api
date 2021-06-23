@@ -19,7 +19,9 @@ def getArgs(argv=None):
         help="Enter in the name of the host you want to see all the processes on.",
     )
     group1.add_argument(
-        "--process", type=str, help="Enter in the name of the process you want to search."
+        "--process",
+        type=str,
+        help="Enter in the name of the process you want to search.",
     )
     parser.add_argument(
         "--window",
@@ -40,13 +42,14 @@ def getArgs(argv=None):
         help="OPTIONAL: Default is 10h Window. Enter end time in this format - 2020-01-18T18:34:04Z",
     )
     args = parser.parse_args(argv)
-    
+
     return args
+
 
 def getConfig():
     """
-    Function reads the contents of the credential file and returns the configuration data 
-    to connect to the API of a specific org. Returns the headers for the api request, the 
+    Function reads the contents of the credential file and returns the configuration data
+    to connect to the API of a specific org. Returns the headers for the api request, the
     org id, and the domain name to connect to.
     """
     if sys.platform == "Windows":
@@ -73,13 +76,25 @@ def getConfig():
     return (address, headers, org)
 
 
-def get_job_id(domain, org_key, headers, hostname="*", process="*", window="10h"):
+def get_job_id(
+    domain,
+    org_key,
+    headers,
+    hostname="*",
+    process="*",
+    window="10h",
+    start="0",
+    end="0",
+):
     """
-    Function takes in the domain, org_key, headers, hostname, and timeframe to generate 
+    Function takes in the domain, org_key, headers, hostname, and timeframe to generate
     the initial query an retrieve the job id of that query returns job_id
     """
     url = f"{domain}/api/investigate/v2/orgs/{org_key}/processes/search_jobs"
-    print(url)
+    if start != "0":
+        time_range = {"end": end, "start": start}
+    else:
+        time_range = {"window": "-" + window}
     if hostname == "*":
         query_payload = {
             "query": "process_name:" + process,
@@ -94,7 +109,7 @@ def get_job_id(domain, org_key, headers, hostname="*", process="*", window="10h"
             "sort": [{"field": "device_timestamp", "order": "asc"}],
             "start": 0,
             "rows": 10000,
-            "time_range": {"window": "-" + window},
+            "time_range": time_range,
         }
     else:
         query_payload = {
@@ -111,7 +126,7 @@ def get_job_id(domain, org_key, headers, hostname="*", process="*", window="10h"
             "sort": [{"field": "device_timestamp", "order": "asc"}],
             "start": 0,
             "rows": 10000,
-            "time_range": {"window": "-" + window},
+            "time_range": time_range,
         }
     print("")
     response = requests.post(url, headers=headers, json=query_payload).json()
@@ -122,8 +137,8 @@ def get_job_id(domain, org_key, headers, hostname="*", process="*", window="10h"
 
 def check_status(domain, org_key, job_id, headers):
     """
-    Takes in the domain, org_key, job_id, and headers as input and generates a new request 
-    that runs until "contacted" == "completed", this indicates that the query has finished 
+    Takes in the domain, org_key, job_id, and headers as input and generates a new request
+    that runs until "contacted" == "completed", this indicates that the query has finished
     running and we can now retrieve results returns the bool True when complete
     """
     url = f"{domain}/api/investigate/v1/orgs/{org_key}/processes/search_jobs/{job_id}"
@@ -140,7 +155,7 @@ def check_status(domain, org_key, job_id, headers):
 
 def get_results(domain, org_key, job_id, headers):
     """
-    Takes in domain, org_key, job_id, and headers as input and retrieves the reults in the 
+    Takes in domain, org_key, job_id, and headers as input and retrieves the reults in the
     proper format. Function returns a dataframe.
     """
     print("Retrieving the results. Please stand by...")
@@ -161,6 +176,9 @@ def df_to_csv(results, param):
     Takes in the dataframe and argument parameter input and writes it to a csv.
     """
     output_file = f"{param}-process.csv"
+    if results.empty:
+        print("No results found. Try expanding your search.")
+        sys.exit(1)
     results.to_csv(
         output_file,
         index=False,
@@ -181,13 +199,29 @@ if __name__ == "__main__":
     domain = str(config[0]).strip("\n")
     headers = config[1]
     org_key = str(config[2]).strip("\n")
+    if args.window and (args.start or args.end):
+        print("ERROR: Please select either Window or Start/End. Cannot specifiy both.")
+        sys.exit(1)
+    if args.start and not args.end:
+        print("ERROR: You must have both Start and End definied")
+        sys.exit(1)
     if args.host:
         hostname = args.host
         param = args.host
         if args.window:
             window = args.window
             job_id = get_job_id(
-                domain, org_key, headers, hostname=hostname, window=window
+                domain,
+                org_key,
+                headers,
+                hostname=hostname,
+                window=window,
+            )
+        elif args.start:
+            start = args.start
+            end = args.end
+            job_id = get_job_id(
+                domain, org_key, headers, hostname=hostname, start=start, end=end
             )
         else:
             job_id = get_job_id(domain, org_key, headers, hostname=hostname)
@@ -199,11 +233,18 @@ if __name__ == "__main__":
             job_id = get_job_id(
                 domain, org_key, headers, process=process, window=window
             )
+        elif args.start:
+            start = args.start
+            end = args.end
+            job_id = get_job_id(
+                domain, org_key, headers, process=process, start=start, end=end
+            )
         else:
             job_id = get_job_id(domain, org_key, headers, process=process)
+
     status = check_status(domain, org_key, job_id, headers)
     if status == True:
         results = get_results(domain, org_key, job_id, headers)
-        print(results)
     df_to_csv(results, param)
-    print("--- %s seconds ---" % (time.time() - start_time))
+    speed = time.time() - start_time
+    print(f"--- {speed} seconds ---")
