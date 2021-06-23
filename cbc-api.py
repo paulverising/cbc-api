@@ -27,7 +27,20 @@ def getArgs(argv=None):
         required=False,
         help="OPTIONAL: Default is 10h. Time window: “2w” where y=year, w=week, d=day, h=hour, m=minute, s=second",
     )
+    parser.add_argument(
+        "--start",
+        type=str,
+        required=False,
+        help="OPTIONAL: Default is 10h Window. Enter start time in this format - 2020-01-18T18:34:04Z",
+    )
+    parser.add_argument(
+        "--end",
+        type=str,
+        required=False,
+        help="OPTIONAL: Default is 10h Window. Enter end time in this format - 2020-01-18T18:34:04Z",
+    )
     args = parser.parse_args(argv)
+    
     return args
 
 def getConfig():
