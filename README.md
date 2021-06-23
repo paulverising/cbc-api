@@ -20,6 +20,8 @@ The “--process PROCESSNAME” option allows you to enter a process name such a
 - Parent Pid
 ## Window
 The “--window” option allows you to specify the time range for the data. This is an optional flag. Default is 10h. Time window: “2w” where y=year, w=week, d=day, h=hour, m=minute, s=second.
+## Start/End
+The "--start" and "--end" options allow you to specify a specific date/time range. You must specify both a start and an end. The format is - `2020-01-18T18:34:04Z`.
 # Setup
 ## Carbon Black Cloud API Setup
 Navigate to the organization's Carbon Black Cloud instance. 
@@ -82,7 +84,8 @@ The recommended method for setting up the python environment is through a python
 With the virtual environment running you can type the either of these commands:
 - `python cbc-api.py --host HOSTNAME`
 - `python cbc-api.py --process PROCESSNAME`
-- optionally specifying the `--window WINDOW` flag you can increase or decrease the time range
+- Optionally specifying the `--window WINDOW` flag you can increase or decrease the time range
+- Optionally specifying the `--start START` and `--end END` flag allows you to specify the specific time range.
 - `python cbc-api.py --help` to see the same information displayed in your terminal
 
 After you are done running the script, you can deactivate the virtual environment by typing:
